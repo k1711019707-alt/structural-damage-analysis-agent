@@ -1,0 +1,59 @@
+[
+  {
+    "name": "混凝土结构设计规范标准号",
+    "query": "GB 50010-2010 混凝土结构设计规范",
+    "expected_standards": [
+      "GB 50010-2010"
+    ],
+    "expected_document_ids": [
+      "00474f7b00ed539d4702"
+    ],
+    "expected_document_tokens": [
+      "GB 50010-2010",
+      "混凝土结构设计规范"
+    ],
+    "expected_token_match": "all"
+  },
+  {
+    "name": "工业建筑可靠性鉴定",
+    "query": "工业建筑可靠性鉴定的基本程序是什么",
+    "expected_document_ids": [
+      "dd35d90e95cfbd9fc9b1"
+    ],
+    "expected_document_tokens": [
+      "工业建筑可靠性鉴定标准"
+    ]
+  },
+  {
+    "name": "民用建筑可靠性鉴定",
+    "query": "民用建筑可靠性鉴定有哪些要求",
+    "expected_document_ids": [
+      "122ac583033c0dbf5545"
+    ],
+    "expected_document_tokens": [
+      "民用建筑可靠性鉴定标准"
+    ]
+  },
+  {
+    "name": "结构加固施工验收",
+    "query": "建筑结构加固工程施工质量验收有哪些要求",
+    "expected_document_ids": [
+      "919710b082c7b1ba0236"
+    ],
+    "expected_document_tokens": [
+      "GB 50550-2010",
+      "建筑结构加固工程施工质量验收规范"
+    ],
+    "expected_token_match": "all"
+  },
+  {
+    "name": "混凝土施工质量验收",
+    "query": "混凝土结构工程施工质量验收规范",
+    "expected_document_ids": [
+      "1241c2dfb509ac63b44f"
+    ],
+    "expected_document_tokens": [
+      "混凝土结构工程施工质量验收规范"
+    ]
+  }
+]

@@ -1,0 +1,66 @@
+# Python and local tooling
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Local settings and credentials
+.env
+.env.*
+gui_api_config.json
+gui_api_config.json.legacy-backup
+gui_settings.json
+*.log
+
+# Generated application data and release output
+build/
+dist/
+runs/
+artifacts/
+knowledge_base/
+dataset/
+YOLO11-seg/
+*.sqlite3
+*.sqlite3-*
+*.npz
+*.npy
+*.cache
+
+# Generated benchmark/evaluation payloads
+benchmarks/rag/**/partial/
+benchmarks/rag/**/ragas_raw.jsonl
+benchmarks/rag/**/generation_rows.jsonl
+benchmarks/rag/**/metric_rows.jsonl
+benchmarks/rag/**/candidates.jsonl
+benchmarks/rag/**/review_template.*
+benchmarks/rag/**/failures.jsonl
+knowledge_pipeline/test/results/
+knowledge_pipeline/test_results/
+
+# Packaged/runtime binaries and archives
+*.dll
+*.pyd
+*.so
+*.dylib
+*.exe
+*.whl
+*.zip
+*.7z
+*.tar
+*.gz
+*.bak
+*.tmp
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo

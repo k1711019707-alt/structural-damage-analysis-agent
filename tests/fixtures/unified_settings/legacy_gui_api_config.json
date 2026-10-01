@@ -1,0 +1,7 @@
+{
+  "responses_url": "https://example.test/v1",
+  "responses_key": "fixture-responses-key",
+  "responses_model": "fixture-model",
+  "fhl_url": "https://example.test/v1/images/edits",
+  "fhl_key": "fixture-fhl-key"
+}

@@ -1,0 +1,43 @@
+{
+  "aggregates": {
+    "mean": {
+      "answer_relevancy": 0.0,
+      "context_precision": null,
+      "context_recall": 1.0,
+      "faithfulness": 0.8421052631578947
+    },
+    "metric_error": "",
+    "non_finite_count": {
+      "answer_relevancy": 0,
+      "context_precision": 1,
+      "context_recall": 0,
+      "faithfulness": 0
+    },
+    "scored_count": 1
+  },
+  "api_key_present": true,
+  "api_key_value_recorded": false,
+  "candidate_path": "E:\\桌面\\海之子\\YOLO11-seg\\benchmarks\\rag\\ragas_pdf_v1\\candidates.jsonl",
+  "candidate_sha256": "433faf9dcb98b32b5f7d3a9a03ef3862a177b888e15d756a95fbc6921bb79601",
+  "created_at": "2026-09-19T04:35:26.776528+00:00",
+  "database_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\results\\index\\pipeline.sqlite3",
+  "database_sha256": "d7ec6ff27e66fdd15caa6464d4d80a2310232058f6c6829a788f67f4f121a6ce",
+  "endpoint_category": "openai_compatible_remote",
+  "failure_count": 0,
+  "generated_count": 1,
+  "input_count": 1,
+  "max_chars": 12000,
+  "metric_count": 1,
+  "metrics": [
+    "faithfulness",
+    "answer_relevancy",
+    "context_precision",
+    "context_recall"
+  ],
+  "model": "gpt-5.6-sol",
+  "python_executable": "D:\\anaconda\\envs\\RAGAS\\python.exe",
+  "ragas_version": "0.4.3",
+  "reference_boundary": "candidate_answer used as reference; input remains non-Gold unless separately promoted",
+  "schema_version": "ragas-pdf-rag-evaluation.v1",
+  "top_k": 6
+}

@@ -1,0 +1,21 @@
+{
+  "attestation": {
+    "double_annotation": false,
+    "review_model": "single_project_owner_attestation",
+    "review_scope": "all_150_records",
+    "reviewer_id": "project-owner-user-attestation",
+    "statement": "用户明确声明已完成全部候选的人工核对且无误"
+  },
+  "database_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\results\\index\\pipeline.sqlite3",
+  "database_sha256": "d7ec6ff27e66fdd15caa6464d4d80a2310232058f6c6829a788f67f4f121a6ce",
+  "dataset_status": "gold_reviewed",
+  "gold_file_sha256": "ca478abcf4f504b79c3ffb3e307bea5ca2c45efeabc3ce4b0106c3881e97ae90",
+  "published_at_utc": "2026-09-18T10:15:08.645047+00:00",
+  "record_count": 150,
+  "review_source_path": "E:\\桌面\\海之子\\YOLO11-seg\\benchmarks\\rag\\formal_v1\\review_attested.jsonl",
+  "review_source_sha256": "e710e6aff4138edbacf06b920a3e6755fb04f8d5025000b5485d5769ae8f34d8",
+  "reviewers": [
+    "project-owner-user-attestation"
+  ],
+  "schema_version": "formal-rag-benchmark.v1"
+}

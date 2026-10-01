@@ -1,0 +1,78 @@
+{
+  "annotation_status": "needs_human_review",
+  "candidate_file_sha256": "9e4ff85a492a2d89387a9ed85d153bca564e3aa18b2be7d0455bf9f923078b3e",
+  "database_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\results\\index\\pipeline.sqlite3",
+  "database_read_only": true,
+  "database_sha256": "d7ec6ff27e66fdd15caa6464d4d80a2310232058f6c6829a788f67f4f121a6ce",
+  "dataset_status": "formal_candidates_pending_human_review",
+  "generated_at_utc": "2026-09-18T09:58:23.457061+00:00",
+  "gold_label": false,
+  "legacy_benchmarks_preserved": true,
+  "record_count": 150,
+  "review_template_file_sha256": "9e4ff85a492a2d89387a9ed85d153bca564e3aa18b2be7d0455bf9f923078b3e",
+  "schema_version": "formal-rag-benchmark.v1",
+  "seed": 20260918,
+  "source_documents": [
+    {
+      "document_id": "0b7d3ea92e12f76d4a82",
+      "original_pdf_resolved": true,
+      "page_count": 3,
+      "quality_score": 1.0,
+      "retrieval_chunk_count": 14,
+      "source_name": "信息化技术在建筑材料检测中的应用_李亚亚-3页纯文本.pdf",
+      "source_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\测试文档\\信息化技术在建筑材料检测中的应用_李亚亚-3页纯文本.pdf",
+      "source_sha256": "829488c3700389bf97dbe7873366493d0df09685ca211da99d3293aac3b5755a"
+    },
+    {
+      "document_id": "868a23438b4404b27393",
+      "original_pdf_resolved": true,
+      "page_count": 85,
+      "quality_score": 0.975,
+      "retrieval_chunk_count": 329,
+      "source_name": "基于深度学习的水下混凝土结构表观病害智慧识别方法_骆堪辉-85页纯图片.pdf",
+      "source_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\测试文档\\基于深度学习的水下混凝土结构表观病害智慧识别方法_骆堪辉-85页纯图片.pdf",
+      "source_sha256": "ce4168cf659ed48932a3523528f1cc10da6b2b32c717a4cc6ae97d2c71b46b50"
+    },
+    {
+      "document_id": "919efb3636e5de82edda",
+      "original_pdf_resolved": true,
+      "page_count": 200,
+      "quality_score": 0.994,
+      "retrieval_chunk_count": 759,
+      "source_name": "混凝土结构设计规范-上-200页纯图片及复杂表格图片.pdf",
+      "source_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\测试文档\\混凝土结构设计规范-上-200页纯图片及复杂表格图片.pdf",
+      "source_sha256": "92c41e88cdc4c3b8716cfd3f5e8c0c32161a37de28f447f2ba400b58ba6959b2"
+    },
+    {
+      "document_id": "9fbf3b3516ce6078b105",
+      "original_pdf_resolved": true,
+      "page_count": 19,
+      "quality_score": 1.0,
+      "retrieval_chunk_count": 9,
+      "source_name": "GB 55034-2022 建筑与市政施工现场安全卫生与职业健康通用规范.pdf",
+      "source_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_base\\source_files\\GB 55034-2022 建筑与市政施工现场安全卫生与职业健康通用规范.pdf",
+      "source_sha256": "f3c3f4dad8954b53c20c95a801b592adf843c28867caf596b2c9f9851c9c593e"
+    }
+  ],
+  "source_pdf_resolution_count": 4,
+  "type_counts": {
+    "exact_identifier": 25,
+    "multi_evidence": 15,
+    "natural_paraphrase": 35,
+    "no_answer": 10,
+    "numeric_unit": 25,
+    "risk_negation_exception": 10,
+    "scope_isolation": 10,
+    "table_query": 20
+  },
+  "type_quotas": {
+    "exact_identifier": 25,
+    "multi_evidence": 15,
+    "natural_paraphrase": 35,
+    "no_answer": 10,
+    "numeric_unit": 25,
+    "risk_negation_exception": 10,
+    "scope_isolation": 10,
+    "table_query": 20
+  }
+}

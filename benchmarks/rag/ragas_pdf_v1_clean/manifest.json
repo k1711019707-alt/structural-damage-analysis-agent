@@ -1,0 +1,62 @@
+{
+  "actual_sample_count": 60,
+  "annotation_boundary": "all records are needs_human_review and gold_label=false",
+  "api_key_present": true,
+  "api_key_value_recorded": false,
+  "coverage": [
+    {
+      "actual_sample_count": 10,
+      "document_id": "0b7d3ea92e12f76d4a82",
+      "error": "",
+      "ragas_unit_count": 5,
+      "retrieval_chunk_count": 14,
+      "source_name": "信息化技术在建筑材料检测中的应用_李亚亚-3页纯文本.pdf",
+      "source_sha256": "829488c3700389bf97dbe7873366493d0df09685ca211da99d3293aac3b5755a",
+      "started_at": "2026-09-19T01:17:50.666120+00:00",
+      "target_sample_count": 10
+    },
+    {
+      "actual_sample_count": 20,
+      "document_id": "868a23438b4404b27393",
+      "error": "",
+      "ragas_unit_count": 7,
+      "retrieval_chunk_count": 329,
+      "source_name": "基于深度学习的水下混凝土结构表观病害智慧识别方法_骆堪辉-85页纯图片.pdf",
+      "source_sha256": "ce4168cf659ed48932a3523528f1cc10da6b2b32c717a4cc6ae97d2c71b46b50",
+      "started_at": "2026-09-19T01:19:46.587149+00:00",
+      "target_sample_count": 20
+    },
+    {
+      "actual_sample_count": 30,
+      "document_id": "919efb3636e5de82edda",
+      "error": "",
+      "ragas_unit_count": 7,
+      "retrieval_chunk_count": 759,
+      "source_name": "混凝土结构设计规范-上-200页纯图片及复杂表格图片.pdf",
+      "source_sha256": "92c41e88cdc4c3b8716cfd3f5e8c0c32161a37de28f447f2ba400b58ba6959b2",
+      "started_at": "2026-09-19T01:23:30.602913+00:00",
+      "target_sample_count": 30
+    }
+  ],
+  "created_at": "2026-09-19T01:29:08.035498+00:00",
+  "database_path": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\results\\index\\pipeline.sqlite3",
+  "database_sha256": "d7ec6ff27e66fdd15caa6464d4d80a2310232058f6c6829a788f67f4f121a6ce",
+  "duplicate_question_count": 0,
+  "embedding": {
+    "dimensions": 512,
+    "name": "deterministic_chinese_char_ngram_hash",
+    "production_semantic_model": false
+  },
+  "endpoint_category": "openai_compatible_remote",
+  "failure_count": 0,
+  "model": "gpt-5.6-sol",
+  "python_executable": "D:\\anaconda\\envs\\RAGAS\\python.exe",
+  "ragas_version": "0.4.3",
+  "rerun_command": "\"D:\\anaconda\\envs\\RAGAS\\python.exe\" \"E:\\桌面\\海之子\\YOLO11-seg\\scripts\\generate_ragas_pdf_testset.py\" --output \"E:\\桌面\\海之子\\YOLO11-seg\\benchmarks\\rag\\ragas_pdf_v1_clean\"",
+  "schema_version": "ragas-pdf-testset-run.v1",
+  "script_sha256": "d3b7dd4ea51a11c92bf2008635f2eb76cd61a964c4e814d282b79fbefd3a968b",
+  "smoke": false,
+  "source_count": 3,
+  "source_directory": "E:\\桌面\\海之子\\YOLO11-seg\\knowledge_pipeline\\test\\测试文档",
+  "target_sample_count": 60
+}

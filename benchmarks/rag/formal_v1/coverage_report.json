@@ -1,0 +1,19 @@
+{
+  "direct_evidence_reuse_count": 0,
+  "direct_evidence_reuse_ratio": 0.0,
+  "errors": [],
+  "record_count": 150,
+  "type_counts": {
+    "exact_identifier": 25,
+    "multi_evidence": 15,
+    "natural_paraphrase": 35,
+    "no_answer": 10,
+    "numeric_unit": 25,
+    "risk_negation_exception": 10,
+    "scope_isolation": 10,
+    "table_query": 20
+  },
+  "unique_direct_evidence": 155,
+  "valid": true,
+  "warnings": []
+}

@@ -1,0 +1,33 @@
+{
+  "model_name": "P2-YOLO11s concrete damage segmentation",
+  "model_version": "p2-yolo11s-seg-960-100epoch",
+  "task": "segment",
+  "architecture": "p2-yolo11s-seg",
+  "strides": [4, 8, 16, 32],
+  "classes": [
+    "Concrete crushing",
+    "Delamination",
+    "Microcrack",
+    "Minor spalling",
+    "Moderate spalling",
+    "Rebar corrosion",
+    "Structural crack",
+    "Structural deformation"
+  ],
+  "training": {
+    "image_size": 960,
+    "epochs": 100,
+    "mask_ratio": 2,
+    "best_epoch_by_mask_map50_95": 97,
+    "mask_map50": 0.66394,
+    "mask_map50_95": 0.48355,
+    "status": "pending_engineer_review"
+  },
+  "artifacts": {
+    "pt": {
+      "filename": "best.pt",
+      "size_bytes": 21958024,
+      "sha256": "3510277ee35bf253de4328c244bdaf2fbdb30d92868b06fbb7b2fd5bef582f4d"
+    }
+  }
+}

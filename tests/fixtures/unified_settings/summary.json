@@ -1,0 +1,6 @@
+{
+  "source_folder": "fixtures",
+  "results": [],
+  "model_provenance": {"model": "fixture"},
+  "inference_provenance": {"runtime": "offline"}
+}
