@@ -69,7 +69,7 @@ flowchart TD
 
 ### 1. 获取源码和模型
 
-仓库为私有仓库，克隆前需要拥有访问权限，并安装 Git 与 Git LFS。
+仓库公开开放，无需申请访问权限。克隆前请安装 Git 与 Git LFS。
 
 ```powershell
 git lfs install
@@ -206,3 +206,9 @@ Windows 发布入口为 `packaging/build_portable.ps1` 和 `packaging/build_sour
 - 自动草稿、软件人工确认记录和修复效果图均不能代替现场检测、专业审核、施工审批或验收。
 
 更多说明：[知识管线](knowledge_pipeline/README.md) · [生产 RAG](knowledge_pipeline/PRODUCTION_RAG_RUNBOOK.md) · [统一设置与文档输出](runtime/README-unified-settings.md) · [报告生成](docs/damage-reporting.md)
+
+## 开源许可证
+
+本项目原创代码采用 **GNU Affero General Public License v3.0（AGPL-3.0）**，完整条款见 [LICENSE](LICENSE)。可以在遵守许可证的前提下使用、修改和分发；分发修改版或通过网络向用户提供修改版服务时，须按许可证提供相应源码。
+
+第三方依赖、预训练模型、训练数据和测试 PDF 等资料保留各自的许可证或版权，不能因仓库公开而视为一并获准再分发。具体说明见 [第三方声明](THIRD_PARTY_NOTICES.md)。
