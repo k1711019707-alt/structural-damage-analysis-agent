@@ -16,7 +16,6 @@ SOURCE_DIRECTORIES = (
     "docs",
     "knowledge_pipeline",
     "models",
-    "openspec",
     "packaging",
     "runtime",
     "scripts",

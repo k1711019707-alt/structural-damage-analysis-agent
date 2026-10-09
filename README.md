@@ -115,8 +115,6 @@ python scripts/launch_yolo11s_seg_gui.py
 4. 核对每项损伤证据、判断与不确定性，确认报告后生成施工方案，再审核方案。
 5. 查看或导出文档；需要修复效果图时，配置并启用对应图像服务。
 
-API 配置存储在本机设置中。`gui_settings.json`、旧版 `gui_api_config.json` 和 `.env` 已被 Git 忽略，分享文件时仍应自行确认不含密钥或敏感现场资料。
-
 ## 知识库与嵌入模型
 
 新克隆的仓库不包含开发机上的生产知识库、活动索引、用户资料或嵌入模型权重。首次使用需要导入自己的资料并完成索引同步。BGE 和部分解析模型首次加载可能需要网络下载；离线部署应预先准备对应本地模型。
@@ -179,8 +177,7 @@ python scripts/train_p2_yolo11s_seg.py --config configs/p2_yolo11s_seg_train.yam
 ├── tests/                 # 自动化回归测试
 ├── packaging/             # Windows 便携版与源码包构建
 ├── tools/                 # 发布验证与数据转换工具
-├── docs/                  # 模块文档与设计记录
-└── openspec/              # 规格、设计与变更记录
+└── docs/                  # 模块文档与设计记录
 ```
 
 `knowledge_base/`、`dataset/`、`runs/`、`build/`、`dist/` 及本机配置属于本地数据或生成目录，已被 Git 忽略。

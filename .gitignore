@@ -11,6 +11,11 @@ htmlcov/
 venv/
 env/
 
+# Local development configuration and change records
+/.opencode/
+/.vscode/
+/openspec/
+
 # Local settings and credentials
 .env
 .env.*
