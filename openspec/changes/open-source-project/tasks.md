@@ -7,4 +7,4 @@
 
 ## 2. Publication
 
-- [ ] 2.1 Push the prepared documents, change visibility to public and verify repository ID, anonymous access, license recognition and remote HEAD.
+- [x] 2.1 Push the prepared documents, change visibility to public and verify repository ID, anonymous access, license recognition and remote HEAD.
