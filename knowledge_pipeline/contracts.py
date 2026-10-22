@@ -228,7 +228,7 @@ class SemanticRetrievalResult:
 class RerankResult:
     query: str
     chunks: list[dict[str, Any]] = field(default_factory=list)
-    reranker: str = "deterministic-baseline"
+    reranker: str = "BAAI/bge-reranker-v2-m3"
     status: StageStatus = field(default_factory=StageStatus)
     schema_version: str = RERANK_SCHEMA_VERSION
     retrieval_mode: str = "unknown"

@@ -10,7 +10,7 @@
 - **损伤分析报告**：结合原图、识别覆盖图、项目概况和选定知识库资料，通过兼容 OpenAI Responses API 的服务生成结构化报告。
 - **人工审核流程**：报告草稿经人工确认后才可生成施工方案；施工方案也具有独立审核状态。
 - **工程知识库**：导入 PDF、DOCX 等资料，支持文件夹分类、扫描 PDF OCR、结构化切片、来源定位和范围内检索。
-- **混合检索**：使用 SQLite FTS5/BM25、标准号和条款号等确定性通道，以及本地 BGE 语义召回；支持层级上下文扩展与确定性重排。
+- **混合检索**：使用 SQLite FTS5/BM25、标准号和条款号等确定性通道，以及本地 BGE 语义召回；使用 `bge-reranker-v2-m3` 重排候选，支持层级上下文扩展。
 - **修复施工方案**：基于已确认报告和参考资料生成工法、材料设备、施工工序、质量、安全及验收草稿。
 - **文档输出**：保存 JSON、Markdown 和生成清单；配置 Word 模板后可输出 DOCX，并嵌入原图及识别覆盖图。
 - **修复效果图**：可选接入 FHL 或硅基流动图像编辑服务，生成用于沟通和复核的修复示意图。
@@ -44,6 +44,7 @@ flowchart TD
 | --- | --- | --- |
 | 损伤识别 | P2-YOLO11s-seg、Ultralytics、PyTorch | 图像实例分割；正式权重为 `models/best.pt` |
 | 文本嵌入 | `BAAI/bge-small-zh-v1.5`、sentence-transformers | 本地工程资料与查询向量编码 |
+| 候选重排 | `BAAI/bge-reranker-v2-m3`、sentence-transformers CrossEncoder | 本地联合编码查询与候选文本，按相关性排序 |
 | 检索存储 | SQLite FTS5、Qdrant | SQLite 保存文本与词法索引；Qdrant 保存全部向量，使用余弦相似度与加权 RRF 融合 |
 | 文档解析 | Docling、PyMuPDF、RapidOCR、Camelot、pdfplumber | PDF 版面、文字、OCR 与表格处理 |
 | 报告与方案 | 兼容 OpenAI Responses API 的模型服务、Pydantic | 多模态分析与结构化输出校验 |
@@ -120,7 +121,7 @@ Windows 启动脚本安装并校验官方 Qdrant 1.19.2，后台运行，仅监�
 
 ## 知识库与嵌入模型
 
-新克隆的仓库不包含开发机上的生产知识库、活动索引、用户资料或嵌入模型权重。首次使用需要导入自己的资料并完成索引同步。BGE 和部分解析模型首次加载可能需要网络下载；离线部署应预先准备对应本地模型。
+新克隆的仓库不包含开发机上的生产知识库、活动索引、用户资料或嵌入及重排模型权重。首次使用需要导入自己的资料并完成索引同步。BGE 和部分解析模型首次加载可能需要网络下载；离线部署应预先准备对应本地模型。
 
 知识管线可独立运行，以下命令演示单份 PDF 的处理与查询：
 
@@ -132,6 +133,10 @@ python -m knowledge_pipeline.embed work/knowledge.sqlite3 work/semantic.qdrant.j
 python -m knowledge_pipeline.retrieve "混凝土结构裂缝如何修复" work/knowledge.sqlite3 work/retrieval.json --semantic-index work/semantic.qdrant.json
 python -m knowledge_pipeline.rerank work/retrieval.json work/reranked.json
 ```
+
+重排默认使用本地 `BAAI/bge-reranker-v2-m3`，自动选择 CUDA 或 CPU，复用已有 sentence-transformers 依赖。模型按需加载并在进程内缓存；每批 4 对，查询与候选合计最多 1024 tokens，超长输入截断。GUI 和 CLI 共用该重排阶段，候选池、加权 RRF、文档范围和层级上下文策略保持不变。模型加载或推理失败时明确告警并回退原规则重排，不会报告模型重排成功。
+
+离线重排可设置环境变量 `YOLO11_RERANKER_MODEL_PATH` 指向仓库外的模型目录；`YOLO11_RERANKER_DEVICE=cpu` 可强制使用 CPU。CLI 也支持 `--model-path` 和 `--device`，例如 `python -m knowledge_pipeline.rerank work/retrieval.json work/reranked.json --model-path D:/models/bge-reranker-v2-m3 --device cpu`。
 
 嵌入只编码用于召回的 child 切片，parent 作为上下文扩展。向量直接批量写入 Qdrant，按文档范围过滤后执行 top-k；JSON 描述文件及伴随清单只保存 collection、模型、维度、数量与完整性摘要，不保存向量。项目不再生成或读取 NumPy sidecar 进行检索。Qdrant 不可用时保留 SQLite 词法召回并报告告警；GUI 生产同步和活动版本切换仍要求通过 Qdrant 完整性门禁。
 

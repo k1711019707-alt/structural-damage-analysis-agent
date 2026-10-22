@@ -382,7 +382,7 @@ def evaluate(
         "lexical_structured": "词法结构化",
         "semantic_only": "纯语义",
         "hybrid_rrf": "词法+语义 RRF",
-        "hybrid_rerank": "混合+确定性重排",
+        "hybrid_rerank": "混合+BGE模型重排",
         "hybrid_rerank_hierarchy": "混合+重排+层级上下文",
         "hybrid_adaptive": "自适应路由混合",
         "hybrid_adaptive_rerank": "自适应路由+重排",

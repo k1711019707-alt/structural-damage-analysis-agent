@@ -1,4 +1,4 @@
-"""Standalone launcher for the deterministic reranking module."""
+"""Standalone launcher for local BGE model reranking."""
 from __future__ import annotations
 
 from pathlib import Path

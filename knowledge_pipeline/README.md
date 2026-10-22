@@ -39,7 +39,9 @@ FTS5，将 parent 作为 context-only 关系保存；正文搜索、标题、条
 
 当前 PDF 转换阶段默认尝试 Docling 版面解析，并由 PyMuPDF 提供页级 inventory、带 bbox 的稳定基础块和失败兜底，RapidOCR 负责扫描页回退；Camelot、pdfplumber 默认自动探测表格。Docling 首次运行可能需要下载版面模型，模型下载失败时自动回退 PyMuPDF 并记录 warning。输出保留 PDF 哈希、页码和 `[KB:document_id:location]` 来源标记。可用 `--no-docling`、`--no-camelot`、`--no-pdfplumber` 关闭增强后端。
 
-表格和版面 warning 现在只作为机器可消费的诊断字段，不阻断自动切片、索引和后续处理；`needs_review` 字段仅保留兼容性，不要求人工审核。`rerank.py` 当前是确定性基线，向量模型或专用 reranker 可以在相同输入输出契约上替换。
+表格和版面 warning 现在只作为机器可消费的诊断字段，不阻断自动切片、索引和后续处理；`needs_review` 字段仅保留兼容性，不要求人工审核。
+
+`rerank.py` 默认通过 sentence-transformers CrossEncoder 加载本地 `BAAI/bge-reranker-v2-m3`，按查询与候选文本相关性排序，不改变召回和加权 RRF。模型在进程内缓存，自动选择 CUDA/CPU；每批 4 对，最大长度 1024 tokens，超长输入截断。首次使用会下载模型；离线时通过 `--model-path` 或 `YOLO11_RERANKER_MODEL_PATH` 指定本地目录，通过 `--device` 或 `YOLO11_RERANKER_DEVICE` 指定设备。加载或推理失败时回退原确定性规则，结果将标注 `deterministic-baseline` 并输出告警；成功时标注完整模型名。输出仍为 `knowledge-rerank.v1`，保留来源、文档范围和层级上下文契约。
 
 `embed.py` 使用本地 `BAAI/bge-small-zh-v1.5` 为 retrieval child 编码，向量直接写入 Qdrant；`semantic.qdrant.json` 与其 `.manifest.json` 仅保存 `knowledge-qdrant.v1` 元数据。`semantic_retrieve.py` 仅查询 Qdrant，文档范围过滤在 top-k 前执行，不再加载 NPZ 向量。先按 [部署说明](../deployment/qdrant/README.md) 启动服务。服务、模型或索引不可用时，`retrieve.py` 保留 SQLite 词法召回并写出 warning；构建和激活必须通过严格校验。
 

@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,10 +13,13 @@ from runtime.knowledge_base import ActiveRagScopeAdapter, KnowledgeBase, pipelin
 
 
 @pytest.fixture(autouse=True)
-def _clear_runtime_rag_cache() -> None:
+def _clear_runtime_rag_cache(monkeypatch) -> None:
     from runtime.knowledge_base import _reset_rag_runtime_cache_for_tests
 
     _reset_rag_runtime_cache_for_tests()
+    monkeypatch.setattr("knowledge_pipeline.rerank._load_model", lambda *_: SimpleNamespace(
+        predict=lambda pairs, **kwargs: [1.0 / (index + 1) for index in range(len(pairs))],
+    ))
     yield
     _reset_rag_runtime_cache_for_tests()
 
@@ -120,6 +124,52 @@ def test_v2_scope_preserves_hierarchical_metadata_and_does_not_broaden(
     assert result.chunks[0].metadata["anchor"] is True
     assert result.chunks[0].source_marker == "[KB:doc-v2:page:1]"
     assert {chunk.document_id for chunk in result.chunks} == {"doc-v2"}
+    assert result.reranker == "BAAI/bge-reranker-v2-m3"
+    assert result.rerank_candidate_count == 1
+    assert result.rerank_selected_count == 1
+
+
+def test_model_failure_warning_reaches_runtime_search(tmp_path: Path, monkeypatch) -> None:
+    def fail(*_args):
+        raise OSError("reranker weights unavailable")
+
+    monkeypatch.setattr("knowledge_pipeline.rerank._load_model", fail)
+    v2_db = tmp_path / "v2.sqlite3"
+    _build_v2(v2_db, {"doc-selected": "裂缝检测", "doc-unselected": "裂缝检测"})
+    _activate_for_test(monkeypatch, v2_db)
+
+    result = pipeline_search_with_scope(
+        ActiveRagScopeAdapter(), "裂缝检测", document_ids=["doc-selected"], top_k=1,
+    )
+
+    assert result.reranker == "deterministic-baseline"
+    assert any("reranker weights unavailable" in warning for warning in result.warnings)
+    assert {chunk.document_id for chunk in result.chunks} == {"doc-selected"}
+    assert result.context_groups
+
+
+def test_model_selects_anchor_and_its_context_without_broadening_scope(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("knowledge_pipeline.rerank._load_model", lambda *_: SimpleNamespace(
+        predict=lambda pairs, **kwargs: [5.0 if "修补前" in text else -5.0 for _, text in pairs],
+    ))
+    v2_db = tmp_path / "v2.sqlite3"
+    _build_v2(v2_db, {
+        "doc-a": "裂缝检测 常规外观记录",
+        "doc-b": "裂缝检测 修补前测量宽度",
+        "doc-unselected": "裂缝检测 修补前检查深度",
+    })
+    _activate_for_test(monkeypatch, v2_db)
+
+    result = pipeline_search_with_scope(
+        ActiveRagScopeAdapter(), "裂缝检测", document_ids=["doc-a", "doc-b"], top_k=1,
+    )
+
+    assert result.chunks[0].chunk_id == "doc-b:child"
+    assert result.chunks[0].metadata["rerank_score"] == 5.0
+    assert {chunk.document_id for chunk in result.chunks} == {"doc-b"}
+    assert any(chunk.metadata.get("expanded") for chunk in result.chunks)
+    assert result.rerank_candidate_count == 2
+    assert result.rerank_selected_count == 1
 
 
 def test_gui_scope_adapter_uses_only_active_v2_with_adaptive_routing(

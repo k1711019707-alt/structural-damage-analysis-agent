@@ -1581,6 +1581,7 @@ def pipeline_search_with_scope(
 
     status_warnings: list[str] = []
     status_warnings.extend(str(item) for item in (v2_result.status.warnings or []) if str(item))
+    status_warnings.extend(str(item) for item in (reranked.status.warnings or []) if str(item))
     return KnowledgeBaseSearchResult(
         tuple(chunks),
         scope_available=scope_available,

@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -31,12 +32,16 @@ def _conversion(document_id: str = "doc-a"):
     )
 
 
-def test_stage_python_api_preserves_source_marker(tmp_path: Path) -> None:
+def test_stage_python_api_preserves_source_marker(tmp_path: Path, monkeypatch) -> None:
     from knowledge_pipeline.chunk import chunk_conversion
     from knowledge_pipeline.generate import build_generation_context
     from knowledge_pipeline.index import build_index
     from knowledge_pipeline.retrieve import retrieve
     from knowledge_pipeline.rerank import rerank_payload
+
+    monkeypatch.setattr("knowledge_pipeline.rerank._load_model", lambda *_: SimpleNamespace(
+        predict=lambda pairs, **kwargs: [0.5] * len(pairs),
+    ))
 
     chunks = chunk_conversion(_conversion(), size=80, overlap=10)
     assert chunks["chunks"][0]["source_marker"] == "[KB:doc-a:page:3]"
@@ -242,9 +247,13 @@ def test_semantic_cli_writes_unavailable_contract_before_failing(
     assert payload["candidates"] == []
 
 
-def test_scope_contract_propagates_through_rerank_and_generation() -> None:
+def test_scope_contract_propagates_through_rerank_and_generation(monkeypatch) -> None:
     from knowledge_pipeline.generate import build_generation_context
     from knowledge_pipeline.rerank import rerank_payload
+
+    monkeypatch.setattr("knowledge_pipeline.rerank._load_model", lambda *_: SimpleNamespace(
+        predict=lambda pairs, **kwargs: [0.5] * len(pairs),
+    ))
 
     retrieved = {
         "query": "裂缝复核",
