@@ -77,6 +77,18 @@ finally {
 if (-not (Test-Path -LiteralPath (Join-Path $Bundle "YOLO11DamageDesktop.exe"))) {
     throw "PyInstaller completed without the expected executable: $Bundle"
 }
+$qdrantTarget = Join-Path $Bundle "deployment\qdrant"
+New-Item -ItemType Directory -Path $qdrantTarget -Force | Out-Null
+foreach ($name in @("start_qdrant.ps1", "stop_qdrant.ps1", "docker-compose.yml", "README.md", "config")) {
+    Copy-Item -LiteralPath (Join-Path $ProjectRoot "deployment\qdrant\$name") -Destination $qdrantTarget -Recurse -Force
+}
+@"
+Start Qdrant before launching the GUI: powershell -File deployment/qdrant/start_qdrant.ps1
+On a new computer, restore the bundled collection using a Python source checkout:
+python scripts/qdrant_snapshot.py restore --active-manifest <bundle>/_internal/knowledge_base/active_rag.json
+Install the project's Python dependencies for this provisioning step.
+The service and its persistent vectors are external to the GUI executable.
+"@ | Set-Content -LiteralPath (Join-Path $Bundle "QDRANT_SETUP.txt") -Encoding UTF8
 & $PythonExe (Join-Path $ProjectRoot "packaging\ensure_fhl_console_hidden.py") (Join-Path $Bundle "_internal\fhl_plugin\generate.mjs")
 if ($LASTEXITCODE -ne 0) { throw "FHL plugin console-suppression patch failed" }
 # Static import libraries are useful for compiling extensions but never loaded

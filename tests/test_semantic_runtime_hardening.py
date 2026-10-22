@@ -7,8 +7,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from knowledge_pipeline import semantic_retrieve
-from knowledge_pipeline.semantic_retrieve import SemanticRetriever
+from knowledge_pipeline import legacy_npz as semantic_retrieve
+from knowledge_pipeline.qdrant_store import readonly_sqlite
+
+# Exercise the migration reader, without exposing it as a runtime retriever.
+def _load_migration_vectors(path, *, embedder=None, expected_index_sha256="", expected_manifest_sha256=""):
+    from types import SimpleNamespace
+    semantic_retrieve.load_semantic_manifest(str(path) + ".manifest.json", expected_sha256=expected_manifest_sha256)
+    vectors, _, _ = semantic_retrieve.load_semantic_arrays(path, expected_sha256=expected_index_sha256)
+    return SimpleNamespace(vectors=vectors)
+
 
 
 def _write_manifest(path: Path, *, count: int, dimension: int) -> None:
@@ -45,7 +53,7 @@ def test_semantic_loader_rejects_object_dtype_before_numpy_materialization(tmp_p
     )
 
     with pytest.raises(ValueError, match="semantic_index_object_dtype_unsafe"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 @pytest.mark.parametrize(
@@ -64,7 +72,7 @@ def test_semantic_loader_rejects_non_float_vector_dtypes(
     )
 
     with pytest.raises(ValueError, match="semantic_index_vector_dtype_invalid"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 @pytest.mark.parametrize("invalid", [np.nan, np.inf, -np.inf])
@@ -78,7 +86,7 @@ def test_semantic_loader_rejects_non_finite_vectors(tmp_path: Path, invalid: flo
     )
 
     with pytest.raises(ValueError, match="semantic_index_vector_non_finite"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 def test_semantic_loader_binds_npz_and_manifest_hashes(tmp_path: Path) -> None:
@@ -95,7 +103,7 @@ def test_semantic_loader_binds_npz_and_manifest_hashes(tmp_path: Path) -> None:
     index_sha256 = hashlib.sha256(sidecar.read_bytes()).hexdigest()
     manifest_sha256 = hashlib.sha256(manifest.read_bytes()).hexdigest()
 
-    retriever = SemanticRetriever(
+    retriever = _load_migration_vectors(
         sidecar,
         embedder=_FakeEmbedder(),
         expected_index_sha256=index_sha256,
@@ -104,14 +112,14 @@ def test_semantic_loader_binds_npz_and_manifest_hashes(tmp_path: Path) -> None:
     assert retriever.vectors.shape == (1, 2)
 
     with pytest.raises(ValueError, match="semantic_index_sha256_mismatch"):
-        SemanticRetriever(
+        _load_migration_vectors(
             sidecar,
             embedder=_FakeEmbedder(),
             expected_index_sha256="0" * 64,
             expected_manifest_sha256=manifest_sha256,
         )
     with pytest.raises(ValueError, match="semantic_manifest_sha256_mismatch"):
-        SemanticRetriever(
+        _load_migration_vectors(
             sidecar,
             embedder=_FakeEmbedder(),
             expected_index_sha256=index_sha256,
@@ -134,7 +142,7 @@ def test_semantic_loader_bounds_manifest_before_json_parse(
     monkeypatch.setattr(semantic_retrieve, "MAX_MANIFEST_BYTES", 16)
 
     with pytest.raises(ValueError, match="semantic_manifest_size_limit"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 @pytest.mark.parametrize(
@@ -163,7 +171,7 @@ def test_semantic_loader_enforces_resource_limits_before_load(
     monkeypatch.setattr(semantic_retrieve, limit_name, limit_value)
 
     with pytest.raises(ValueError, match=expected):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 def test_semantic_loader_rejects_count_and_dimension_limits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,12 +184,12 @@ def test_semantic_loader_rejects_count_and_dimension_limits(tmp_path: Path, monk
     )
     monkeypatch.setattr(semantic_retrieve, "MAX_SEMANTIC_COUNT", 1)
     with pytest.raises(ValueError, match="semantic_index_count_limit"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
     monkeypatch.setattr(semantic_retrieve, "MAX_SEMANTIC_COUNT", 10)
     monkeypatch.setattr(semantic_retrieve, "MAX_SEMANTIC_DIMENSION", 2)
     with pytest.raises(ValueError, match="semantic_index_dimension_limit"):
-        SemanticRetriever(sidecar, embedder=_FakeEmbedder())
+        _load_migration_vectors(sidecar, embedder=_FakeEmbedder())
 
 
 def test_readonly_sqlite_helpers_reject_writes(tmp_path: Path) -> None:
@@ -193,7 +201,7 @@ def test_readonly_sqlite_helpers_reject_writes(tmp_path: Path) -> None:
     from knowledge_pipeline.retrieve import _readonly_sqlite as retrieve_readonly
     from runtime.knowledge_base import _readonly_sqlite as runtime_readonly
 
-    for factory in (semantic_retrieve._readonly_sqlite, retrieve_readonly, runtime_readonly):
+    for factory in (readonly_sqlite, retrieve_readonly, runtime_readonly):
         with factory(db_path) as readonly:
             assert readonly.execute("PRAGMA query_only").fetchone()[0] == 1
             assert readonly.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
@@ -202,63 +210,17 @@ def test_readonly_sqlite_helpers_reject_writes(tmp_path: Path) -> None:
                 readonly.execute("INSERT INTO sample(value) VALUES ('blocked')")
 
 
-def test_production_semantic_health_reuses_bounded_loader(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from knowledge_pipeline.index import build_index
+def test_production_semantic_health_rejects_legacy_npz(tmp_path: Path) -> None:
     from runtime import rag_production
+    import sqlite3
 
-    db = tmp_path / "pipeline.sqlite3"
-    build_index(
-        {
-            "schema_version": "knowledge-chunks.v2",
-            "document_id": "doc-semantic-health",
-            "source_sha256": "a" * 64,
-            "metadata": {"source_path": "source.pdf", "source_name": "source.pdf", "quality_score": 1.0},
-            "chunks": [
-                {
-                    "chunk_id": "doc-semantic-health:c0",
-                    "location": "page:1",
-                    "text": "裂缝检测",
-                    "source_marker": "[KB:doc-semantic-health:page:1]",
-                    "metadata": {"retrieval_role": "retrieval", "text_search": "裂缝检测", "page_numbers": [1]},
-                }
-            ],
-        },
-        db,
-    )
-    with sqlite3.connect(db) as connection:
-        row = connection.execute(
-            "SELECT chunk_id,content_hash FROM pipeline_chunks WHERE retrieval_role='retrieval'"
-        ).fetchone()
-    identity = [(str(row[0]), str(row[1]))]
-    import hashlib
-
-    fingerprint = hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
-    sidecar = tmp_path / "semantic-health.npz"
-    _write_sidecar(
-        sidecar,
-        vectors=np.ones((1, 2), dtype=np.float32),
-        chunk_ids=np.asarray([identity[0][0]], dtype=np.str_),
-        hashes=np.asarray([identity[0][1]], dtype=np.str_),
-    )
-    Path(str(sidecar) + ".manifest.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "knowledge-embeddings.v1",
-                "count": 1,
-                "dimension": 2,
-                "source_fingerprint": fingerprint,
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(semantic_retrieve, "MAX_VECTOR_BYTES", 1)
-
-    result = rag_production.inspect_v2_database(db, semantic_index_path=sidecar, strict=True)
-
-    assert result["healthy"] is False
-    assert "semantic_index_vector_size_limit" in result["integrity_errors"]
+    sidecar = tmp_path / "legacy.npz"
+    _write_sidecar(sidecar, vectors=np.ones((1, 2), dtype=np.float32),
+                   chunk_ids=np.asarray(["chunk"]), hashes=np.asarray(["hash"]))
+    with sqlite3.connect(":memory:") as db:
+        health = rag_production._semantic_health(sidecar, db)
+    assert not health["healthy"]
+    assert health["reason"] == "semantic_qdrant_descriptor_required"
 
 
 def test_knowledge_base_read_apis_use_query_only_connections(tmp_path: Path) -> None:

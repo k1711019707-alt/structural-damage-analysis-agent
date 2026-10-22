@@ -1,4 +1,4 @@
-"""Standalone launcher for the optional local embedding sidecar module."""
+"""Standalone launcher for local Qdrant embedding construction."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +7,7 @@ from test_support import artifact_line, ensure_paths, print_header, read_json, r
 
 
 INPUT_DB_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\index\pipeline.sqlite3")
-OUTPUT_INDEX_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\embed\semantic.npz")
+OUTPUT_INDEX_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\embed\semantic.qdrant.json")
 OUTPUT_MANIFEST_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\embed\semantic_manifest.json")
 
 

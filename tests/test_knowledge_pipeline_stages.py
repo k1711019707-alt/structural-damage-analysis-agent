@@ -600,7 +600,7 @@ def test_retrieval_exact_standard_and_clause_variants(tmp_path: Path) -> None:
     assert "clause_exact" in clause.chunks[0].metadata["retrieval_channels"]
 
 
-def test_local_semantic_sidecar_and_hybrid_fusion(tmp_path: Path) -> None:
+def test_local_qdrant_and_hybrid_fusion(tmp_path: Path, qdrant_client) -> None:
     from knowledge_pipeline.embed import build_embedding_index
     from knowledge_pipeline.index import build_index
     from knowledge_pipeline.retrieve import retrieve
@@ -621,7 +621,7 @@ def test_local_semantic_sidecar_and_hybrid_fusion(tmp_path: Path) -> None:
 
     db = tmp_path / "semantic.sqlite3"
     build_index(payload, db)
-    sidecar = tmp_path / "semantic.npz"
+    sidecar = tmp_path / "semantic.qdrant.json"
     build_embedding_index(db, sidecar, model_name="fake", embedder=FakeEmbedder())
     semantic = SemanticRetriever(sidecar, embedder=FakeEmbedder())
     candidates = semantic.search("梁体发现裂纹", db, document_ids=["doc-semantic"], top_k=1)

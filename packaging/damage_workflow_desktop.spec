@@ -106,6 +106,7 @@ for package in (
     "rapidocr",
     "runtime.assistant",
     "knowledge_pipeline",
+    "qdrant_client",
     "sentence_transformers",
     "transformers",
     "docling",

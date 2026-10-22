@@ -176,11 +176,27 @@ portable 相对路径只能位于用户知识库根目录之下；包含 `..` �
 
 质量告警会合并 `quality_report.warnings` 与 `metadata.conversion_warnings` 并去重。严重告警匹配前会统一大小写、移除空白、常见标点及“第 N 页/Page N”等页码前缀，因此诸如“O C R 失 败”“页面没有可用原生文本 或 OCR 文本”“编码异常”不会被普通复核 warning 遮蔽。
 
-激活 manifest 记录数据库实际 SHA 和验证证据。运行时会重新计算 SHA，并验证当前 schema/index stage、每个文档的 page count 与 `pipeline_pages` 行数、FTS parity、metadata coverage 和可选 semantic sidecar。active manifest 缺少 `database_sha256` 也会被判定为 unhealthy，并保留 legacy fallback。
+激活 manifest 记录数据库实际 SHA 和验证证据。运行时重新校验 SHA、schema/index stage、page inventory、FTS parity、metadata coverage 与 Qdrant 描述文件。active manifest 缺少 `database_sha256` 会被判定为 unhealthy，并保留 legacy fallback。
 
-## 4. Optional semantic sidecar
+## 4. Qdrant vector storage
 
-semantic sidecar 不是必须项。未配置时 v2 词法/结构化检索可正常使用；一旦配置，就必须同时存在 `.npz` 和 `.manifest.json`。健康检查使用 `allow_pickle=False` 实际打开 NPZ，拒绝 object dtype，要求 `vectors` 为二维、`chunk_ids`/`content_hashes` 为安全的一维字符串数组，数组数量、向量维度、schema、chunk 顺序、内容哈希和 corpus fingerprint 全部与 SQLite 一致。相对路径统一相对于用户知识库根目录解析。
+向量仅存入本地 Qdrant，SQLite 保留 BM25、正文、层级关系和引用。构建前启动服务：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deployment/qdrant/start_qdrant.ps1
+```
+
+构建器输出 `semantic.qdrant.json` 及同内容的 `.manifest.json`，仅保存版本化 collection、模型与完整性元数据，不保存向量。构建/激活完整读取 collection，验证数量、维度、余弦距离、chunk/content/document 身份、SQLite 指纹和向量摘要。活动状态检查使用数量、维度、指纹与文件 SHA；查询再次校验语料与返回候选身份。Qdrant 中断只降级为 SQLite 词法检索，绝不回退 NPZ。
+
+旧安装先运行 `python scripts/sync_qdrant.py`：有界读取旧 NPZ，一次性导入、校验后原子替换 active manifest；失败保留原 manifest。新版本运行时不支持旧 NPZ，需要先完成迁移。各候选使用独立 collection，回滚应指向已迁移、仍存在的 collection。
+
+备份必须同时保留 SQLite、活动 manifest、描述文件、本地嵌入模型及 Qdrant 原生快照。便携打包自动附带快照，目标机启动 Qdrant 后运行：
+
+```powershell
+python scripts/qdrant_snapshot.py restore --active-manifest knowledge_base/active_rag.json
+```
+
+恢复前校验快照 SHA，恢复后校验 collection 向量摘要；不覆盖内容不一致的现有 collection。部署、独立快照导出与数据目录说明见 [Qdrant 操作说明](../deployment/qdrant/README.md)。
 
 ## 5. Rollback
 

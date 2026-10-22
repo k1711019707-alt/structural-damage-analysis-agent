@@ -1,0 +1,11 @@
+log_level: INFO
+
+storage:
+  storage_path: ./storage
+
+service:
+  host: 127.0.0.1
+  http_port: 6333
+  grpc_port: 6334
+
+telemetry_disabled: true

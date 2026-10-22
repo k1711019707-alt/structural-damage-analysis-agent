@@ -349,6 +349,8 @@ def prepare_portable_resources(
         raise PortableResourceError(f"active production RAG is unhealthy: {source_health.get('reason', 'unknown')}")
 
     semantic_payload = json.loads(semantic_manifest.read_text(encoding="utf-8"))
+    if semantic_payload.get("schema_version") != "knowledge-qdrant.v1":
+        raise PortableResourceError("migrate the active vector store to Qdrant before packaging")
     model_name = str(semantic_payload.get("model_name") or "").strip()
     if not model_name:
         raise PortableResourceError("active semantic manifest does not identify its embedding model")
@@ -414,6 +416,13 @@ def prepare_portable_resources(
         staged_semantic_manifest.write_text(
             json.dumps(staged_semantic_payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        # Descriptor and companion must remain identical after path sanitization.
+        staged_semantic.write_bytes(staged_semantic_manifest.read_bytes())
+        from knowledge_pipeline.qdrant_backup import export_snapshot
+
+        snapshot_relative = semantic_relative.parent / "vectors.snapshot"
+        snapshot = export_snapshot(staged_semantic, staged_kb / snapshot_relative)
+        snapshot["path"] = snapshot_relative.as_posix()
         portable_db_sha = sha256_file(staged_database)
         portable_semantic_sha = sha256_file(staged_semantic)
         portable_semantic_manifest_sha = sha256_file(staged_semantic_manifest)
@@ -439,6 +448,8 @@ def prepare_portable_resources(
                 "semantic_index_sha256": portable_semantic_sha,
                 "semantic_manifest_path": semantic_manifest_relative.as_posix(),
                 "semantic_manifest_sha256": portable_semantic_manifest_sha,
+                "semantic_backend": "qdrant",
+                "qdrant_snapshot": snapshot,
                 "source_documents": staged_sources,
                 "rollback_manifest": "",
                 "previous": {},

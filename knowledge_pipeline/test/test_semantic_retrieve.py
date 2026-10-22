@@ -8,7 +8,7 @@ from test_support import artifact_line, ensure_paths, print_header, read_json, r
 
 QUERY = "混凝土结构加固设计要求"
 DOCUMENT_ID = "919efb3636e5de82edda"
-INPUT_INDEX_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\embed\semantic.npz")
+INPUT_INDEX_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\embed\semantic.qdrant.json")
 INPUT_DB_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\index\pipeline.sqlite3")
 OUTPUT_PATH = Path(r"E:\桌面\海之子\YOLO11-seg\knowledge_pipeline\test\results\semantic_retrieve\semantic_retrieval.json")
 
@@ -19,7 +19,7 @@ def main() -> int:
     ensure_paths(OUTPUT_PATH)
     print_header("semantic_retrieve", INPUT_INDEX_PATH, OUTPUT_PATH)
     if not INPUT_INDEX_PATH.exists() or not INPUT_DB_PATH.exists():
-        print(f"[semantic_retrieve] status=failed error=missing sidecar or database; run test_embed.py and test_index.py first")
+        print(f"[semantic_retrieve] status=failed error=missing Qdrant descriptor or database; run test_embed.py and test_index.py first")
         return 1
     code = run_entrypoint(
         "semantic_retrieve",

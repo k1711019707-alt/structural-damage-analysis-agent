@@ -61,7 +61,9 @@ def sha256_file(path: Path) -> str:
 
 def _excluded(relative: Path) -> bool:
     return (
-        any(part in EXCLUDED_DIRECTORY_NAMES for part in relative.parts[:-1])
+        relative.parts[:2] in {("qdrant", "storage"), ("qdrant", "snapshots")}
+        or relative.name == ".qdrant-initialized"
+        or any(part in EXCLUDED_DIRECTORY_NAMES for part in relative.parts[:-1])
         or relative.name in EXCLUDED_FILE_NAMES
         or relative.suffix.casefold() in {".pyc", ".pyo"}
     )
@@ -143,8 +145,10 @@ def build_source_release(
             "## Start on another Windows computer\n\n"
             "1. Create the environment with `conda env create -f environment.yml`.\n"
             "2. Activate it with `conda activate YOLO11-HAI`.\n"
-            "3. Run `start_yolo11s_seg_gui.bat`.\n"
-            "4. Configure remote API credentials in the GUI on that computer; credentials are not distributed.\n",
+            "3. Start Qdrant: `powershell -File deployment/qdrant/start_qdrant.ps1`.\n"
+            "4. Restore vectors: `python scripts/qdrant_snapshot.py restore --active-manifest knowledge_base/active_rag.json`.\n"
+            "5. Run `start_yolo11s_seg_gui.bat`.\n"
+            "6. Configure remote API credentials in the GUI; credentials are not distributed.\n",
             encoding="utf-8",
         )
         active = json.loads((target / "knowledge_base" / "active_rag.json").read_text(encoding="utf-8"))

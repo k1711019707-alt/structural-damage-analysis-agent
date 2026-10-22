@@ -12,10 +12,10 @@ pdf_convert -> chunk -> index -> retrieve -> rerank -> generate
 python -m knowledge_pipeline.pdf_convert input.pdf converted.json
 python -m knowledge_pipeline.chunk converted.json chunks.json
 python -m knowledge_pipeline.index chunks.json knowledge_pipeline.sqlite3 --manifest index_manifest.json
-python -m knowledge_pipeline.embed knowledge_pipeline.sqlite3 semantic.npz --model BAAI/bge-small-zh-v1.5
+python -m knowledge_pipeline.embed knowledge_pipeline.sqlite3 semantic.qdrant.json --model BAAI/bge-small-zh-v1.5
 python -m knowledge_pipeline.retrieve "结构裂缝修复" knowledge_pipeline.sqlite3 retrieval.json
-python -m knowledge_pipeline.retrieve "结构裂缝如何修复" knowledge_pipeline.sqlite3 retrieval.json --semantic-index semantic.npz
-python -m knowledge_pipeline.retrieve "结构裂缝如何修复" knowledge_pipeline.sqlite3 retrieval.json --semantic-index semantic.npz --bm25-weight 1.0 --vector-weight 2.0 --fusion-k 60
+python -m knowledge_pipeline.retrieve "结构裂缝如何修复" knowledge_pipeline.sqlite3 retrieval.json --semantic-index semantic.qdrant.json
+python -m knowledge_pipeline.retrieve "结构裂缝如何修复" knowledge_pipeline.sqlite3 retrieval.json --semantic-index semantic.qdrant.json --bm25-weight 1.0 --vector-weight 2.0 --fusion-k 60
 python -m knowledge_pipeline.rerank retrieval.json reranked.json
 python -m knowledge_pipeline.generate reranked.json generation_context.json --prompt "按证据生成工程草案"
 python -m knowledge_pipeline.generate retrieval.json damage_summary_context.json --generation-mode damage-grounded-summary --prompt "总结裂缝损伤的检查重点和后续措施"
@@ -41,6 +41,6 @@ FTS5，将 parent 作为 context-only 关系保存；正文搜索、标题、条
 
 表格和版面 warning 现在只作为机器可消费的诊断字段，不阻断自动切片、索引和后续处理；`needs_review` 字段仅保留兼容性，不要求人工审核。`rerank.py` 当前是确定性基线，向量模型或专用 reranker 可以在相同输入输出契约上替换。
 
-可选的 `embed.py` 使用本地 `BAAI/bge-small-zh-v1.5` 为 retrieval child 生成 `knowledge-embeddings.v1` 旁路索引；`semantic_retrieve.py` 使用 NumPy 余弦相似度执行语义召回。语义依赖、模型或索引不可用时，`retrieve.py` 自动保留确定性词法召回并写出 warning，不影响原有流程。
+`embed.py` 使用本地 `BAAI/bge-small-zh-v1.5` 为 retrieval child 编码，向量直接写入 Qdrant；`semantic.qdrant.json` 与其 `.manifest.json` 仅保存 `knowledge-qdrant.v1` 元数据。`semantic_retrieve.py` 仅查询 Qdrant，文档范围过滤在 top-k 前执行，不再加载 NPZ 向量。先按 [部署说明](../deployment/qdrant/README.md) 启动服务。服务、模型或索引不可用时，`retrieve.py` 保留 SQLite 词法召回并写出 warning；构建和激活必须通过严格校验。
 
 混合召回会分别生成 BM25 与向量候选，再按 `chunk_id` 去重并使用加权 RRF 融合；默认 BM25 权重为 `1.0`、向量权重为 `2.0`、`fusion_k=60`。结果 metadata 保留各通道 rank、原始分数、融合贡献和总分。只有 retrieval child 参与 BM25 和向量候选竞争，context-only parent 在 child 命中后回取。

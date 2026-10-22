@@ -19,7 +19,7 @@ from typing import Any
 
 from knowledge_pipeline.contracts import INDEX_SCHEMA_VERSION
 from knowledge_pipeline.index import INDEX_STAGE_VERSION
-from knowledge_pipeline.semantic_retrieve import load_semantic_arrays, load_semantic_manifest
+from knowledge_pipeline.qdrant_store import load_descriptor as load_semantic_manifest, qdrant_health
 from runtime.app_paths import (
     active_rag_db_path,
     active_rag_manifest_path,
@@ -259,6 +259,7 @@ def _semantic_health(
     expected_index_sha256: str = "",
     expected_manifest_sha256: str = "",
     root: str | Path | None = None,
+    verify_vectors: bool = True,
 ) -> dict[str, Any]:
     path = resolve_knowledge_portable_path(path_value, root=root)
     result: dict[str, Any] = {
@@ -291,39 +292,13 @@ def _semantic_health(
             "manifest_sha256": manifest_sha256,
             "manifest": manifest,
         })
-        rows = db.execute(
-            "SELECT chunk_id,content_hash FROM pipeline_chunks "
-            "WHERE retrieval_role='retrieval' AND text_search<>'' ORDER BY document_id,location,chunk_id"
-        ).fetchall()
-        identity = [(str(row[0]), str(row[1] or "")) for row in rows]
-        fingerprint = hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
-        result.update({"retrieval_count": len(identity), "source_fingerprint": fingerprint})
-        vectors, chunk_ids, content_hashes = load_semantic_arrays(
-            path,
-            expected_sha256=index_sha256,
-        )
-        result.update({
-            "vectors_shape": list(vectors.shape),
-            "chunk_ids_shape": list(chunk_ids.shape),
-            "content_hashes_shape": list(content_hashes.shape),
-        })
-        if any(array.dtype.kind == "O" for array in (vectors, chunk_ids, content_hashes)):
-            result.update({"healthy": False, "reason": "semantic_object_dtype_unsafe"})
-        elif str(manifest.get("schema_version") or "") != "knowledge-embeddings.v1":
-            result.update({"healthy": False, "reason": "semantic_schema_incompatible"})
-        elif vectors.ndim != 2 or chunk_ids.ndim != 1 or content_hashes.ndim != 1:
-            result.update({"healthy": False, "reason": "semantic_array_shape_invalid"})
-        elif vectors.shape[0] != chunk_ids.shape[0] or vectors.shape[0] != content_hashes.shape[0]:
-            result.update({"healthy": False, "reason": "semantic_array_count_mismatch"})
-        elif _finite_int(manifest.get("count")) != len(identity) or vectors.shape[0] != len(identity):
-            result.update({"healthy": False, "reason": "semantic_count_mismatch"})
-        elif _finite_int(manifest.get("dimension")) != int(vectors.shape[1]):
-            result.update({"healthy": False, "reason": "semantic_dimension_mismatch"})
-        elif not manifest.get("source_fingerprint") or str(manifest.get("source_fingerprint")) != fingerprint:
-            result.update({"healthy": False, "reason": "semantic_fingerprint_mismatch"})
-        elif [(str(chunk_id), str(content_hash)) for chunk_id, content_hash in zip(chunk_ids.tolist(), content_hashes.tolist())] != identity:
-            result.update({"healthy": False, "reason": "semantic_corpus_identity_mismatch"})
-        elif sha256_file(path) != index_sha256:
+        descriptor, _ = load_semantic_manifest(path)
+        if descriptor != manifest:
+            raise ValueError("semantic_manifest_descriptor_mismatch")
+        health = qdrant_health(path, db=db, verify_vectors=verify_vectors)
+        result.update(health)
+        result["manifest"] = manifest
+        if sha256_file(path) != index_sha256:
             result.update({"healthy": False, "reason": "semantic_index_changed_during_validation"})
         elif sha256_file(manifest_path) != manifest_sha256:
             result.update({"healthy": False, "reason": "semantic_manifest_changed_during_validation"})
@@ -609,15 +584,23 @@ def active_rag_status(manifest_path: str | Path | None = None) -> dict[str, Any]
     if semantic_configured and not str(manifest.get("semantic_manifest_sha256") or "").strip():
         return {"active": False, "reason": "manifest_semantic_manifest_sha256_missing", "legacy_fallback": True, "manifest": manifest, "semantic": empty_semantic, **diagnostics}
     semantic_path = _resolve_portable_path(manifest.get("semantic_index_path"), manifest_path=selected_manifest_path) if semantic_configured else None
+    # Active queries may retain lexical retrieval during a Qdrant outage.
+    # Build and activation still enforce full Qdrant integrity gates.
     health = inspect_v2_database(
         db_path,
         expected_sha256=str(manifest.get("database_sha256") or ""),
-        semantic_index_path=semantic_path,
-        expected_semantic_index_sha256=str(manifest.get("semantic_index_sha256") or ""),
-        expected_semantic_manifest_sha256=str(manifest.get("semantic_manifest_sha256") or ""),
         semantic_root=selected_manifest_path.parent,
         strict=True,
     )
+    if health.get("healthy") and semantic_configured and semantic_path is not None:
+        with closing(_readonly_sqlite(db_path)) as semantic_db:
+            health["semantic"] = _semantic_health(
+                semantic_path, semantic_db,
+                expected_index_sha256=str(manifest.get("semantic_index_sha256") or ""),
+                expected_manifest_sha256=str(manifest.get("semantic_manifest_sha256") or ""),
+                root=selected_manifest_path.parent,
+                verify_vectors=False,
+            )
     semantic = health.get("semantic") if isinstance(health.get("semantic"), dict) else empty_semantic
     if not health.get("healthy"):
         return {"active": False, "reason": health.get("reason", "database_unhealthy"), "legacy_fallback": True, "manifest": manifest, "database": health, "semantic": semantic, **diagnostics}
@@ -792,7 +775,7 @@ def _activate_rag_locked(
         snapshot_scope = snapshot_root / "scope.json"
         snapshot_build = snapshot_root / "build.json"
         snapshot_legacy = snapshot_root / "legacy.sqlite3"
-        snapshot_semantic = snapshot_root / "semantic.npz"
+        snapshot_semantic = snapshot_root / "semantic.qdrant.json"
         snapshot_semantic_manifest = Path(str(snapshot_semantic) + ".manifest.json")
         # Byte-for-byte copies are used here because the activation contract is
         # bound to file SHA-256. SQLite backup() may rewrite page layout and
@@ -881,6 +864,7 @@ def _activate_rag_locked(
         "documents": health.get("documents", 0), "chunks": health.get("chunks", 0),
         "retrieval_children": health.get("retrieval_children", 0), "fts_rows": health.get("fts_rows", 0),
         "semantic_index_path": _portable_path(semantic_source) if semantic_source else "",
+        "semantic_backend": "qdrant" if semantic_source else "",
         "semantic_index_sha256": str(semantic_health.get("index_sha256") or ""),
         "semantic_manifest_path": _portable_path(semantic_manifest_source) if semantic_manifest_source else "",
         "semantic_manifest_sha256": str(semantic_health.get("manifest_sha256") or ""),

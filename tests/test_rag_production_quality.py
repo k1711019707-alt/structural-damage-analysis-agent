@@ -50,31 +50,14 @@ def _indexed_database(tmp_path: Path, *, document_id: str = "doc-quality", diges
 
 def _semantic_sidecar(db: Path, path: Path) -> Path:
     import numpy as np
-
+    from knowledge_pipeline.qdrant_store import retrieval_rows, source_fingerprint, sync_vectors
     with sqlite3.connect(db) as connection:
-        rows = connection.execute(
-            "SELECT chunk_id,content_hash FROM pipeline_chunks "
-            "WHERE retrieval_role='retrieval' AND text_search<>'' ORDER BY document_id,location,chunk_id"
-        ).fetchall()
-    identity = [(str(row[0]), str(row[1])) for row in rows]
-    fingerprint = hashlib.sha256(
-        json.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    ).hexdigest()
-    np.savez_compressed(
-        path,
-        vectors=np.ones((len(identity), 3), dtype=np.float32),
-        chunk_ids=np.asarray([item[0] for item in identity]),
-        content_hashes=np.asarray([item[1] for item in identity]),
-    )
-    Path(str(path) + ".manifest.json").write_text(
-        json.dumps({
-            "schema_version": "knowledge-embeddings.v1",
-            "count": len(identity),
-            "dimension": 3,
-            "source_fingerprint": fingerprint,
-        }),
-        encoding="utf-8",
-    )
+        rows = retrieval_rows(connection)
+    sync_vectors(np.ones((len(rows), 3), dtype=np.float32),
+                 [row["chunk_id"] for row in rows], [row["content_hash"] for row in rows],
+                 document_ids=[row["document_id"] for row in rows], collection_name="quality-test",
+                 model_name="fake", source_fingerprint_value=source_fingerprint((row["chunk_id"], row["content_hash"]) for row in rows),
+                 descriptor_path=path)
     return path
 
 
@@ -215,12 +198,12 @@ def test_committed_wal_state_blocks_health_and_activation(tmp_path: Path, monkey
         writer.close()
 
 
-def test_active_status_binds_semantic_identity_and_rejects_npz_replacement(tmp_path: Path, monkeypatch) -> None:
+def test_active_status_binds_qdrant_identity_and_warns_on_descriptor_replacement(tmp_path: Path, monkeypatch, qdrant_client) -> None:
     import numpy as np
     import runtime.rag_production as production
 
     db = _indexed_database(tmp_path)
-    sidecar = _semantic_sidecar(db, tmp_path / "semantic.npz")
+    sidecar = _semantic_sidecar(db, tmp_path / "semantic.qdrant.json")
     health = production.inspect_v2_database(db, semantic_index_path=sidecar, strict=True)
     semantic = health["semantic"]
     active_manifest = tmp_path / "active_rag.json"
@@ -238,21 +221,20 @@ def test_active_status_binds_semantic_identity_and_rejects_npz_replacement(tmp_p
     assert status["semantic"] == semantic
     assert status["semantic"]["path"] == str(sidecar.resolve())
 
-    with np.load(sidecar, allow_pickle=False) as arrays:
-        vectors = np.asarray(arrays["vectors"]) * 2
-        chunk_ids = np.asarray(arrays["chunk_ids"])
-        content_hashes = np.asarray(arrays["content_hashes"])
-    np.savez_compressed(sidecar, vectors=vectors, chunk_ids=chunk_ids, content_hashes=content_hashes)
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["switched"] = True
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
     replaced = production.active_rag_status()
-    assert replaced["active"] is False
-    assert replaced["reason"] == "semantic_index_sha256_mismatch"
+    assert replaced["active"] is True
+    assert replaced["semantic"]["healthy"] is False
+    assert replaced["semantic"]["reason"] == "semantic_index_sha256_mismatch"
 
 
-def test_active_status_detects_companion_manifest_switch_during_validation(tmp_path: Path, monkeypatch) -> None:
+def test_active_status_detects_companion_manifest_switch_during_validation(tmp_path: Path, monkeypatch, qdrant_client) -> None:
     import runtime.rag_production as production
 
     db = _indexed_database(tmp_path)
-    sidecar = _semantic_sidecar(db, tmp_path / "semantic.npz")
+    sidecar = _semantic_sidecar(db, tmp_path / "semantic.qdrant.json")
     health = production.inspect_v2_database(db, semantic_index_path=sidecar, strict=True)
     semantic = health["semantic"]
     active_manifest = tmp_path / "active_rag.json"
@@ -264,7 +246,7 @@ def test_active_status_detects_companion_manifest_switch_during_validation(tmp_p
         "semantic_manifest_sha256": semantic["manifest_sha256"],
     }), encoding="utf-8")
     monkeypatch.setattr(production, "active_rag_manifest_path", lambda: active_manifest)
-    real_load = production.load_semantic_arrays
+    real_load = production.qdrant_health
 
     def switching_load(*args, **kwargs):
         arrays = real_load(*args, **kwargs)
@@ -274,20 +256,20 @@ def test_active_status_detects_companion_manifest_switch_during_validation(tmp_p
         manifest_path.write_text(json.dumps(payload), encoding="utf-8")
         return arrays
 
-    monkeypatch.setattr(production, "load_semantic_arrays", switching_load)
+    monkeypatch.setattr(production, "qdrant_health", switching_load)
     status = production.active_rag_status()
-    assert status["active"] is False
-    assert status["reason"] == "semantic_manifest_changed_during_validation"
+    assert status["active"] is True
+    assert status["semantic"]["reason"] == "semantic_manifest_changed_during_validation"
 
 
-def test_activation_records_and_replays_semantic_digests(tmp_path: Path, monkeypatch) -> None:
+def test_activation_records_and_replays_semantic_digests(tmp_path: Path, monkeypatch, qdrant_client) -> None:
     import runtime.rag_production as production
     import scripts.validate_production_rag as validator
 
     monkeypatch.setenv("YOLO11_DAMAGE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(validator, "active_rag_status", lambda: {"active": False})
     db = _indexed_database(tmp_path)
-    sidecar = _semantic_sidecar(db, tmp_path / "semantic.npz")
+    sidecar = _semantic_sidecar(db, tmp_path / "semantic.qdrant.json")
     activation_kwargs = _activation_inputs(tmp_path, db, production, validator)
 
     manifest = production.activate_rag(db, semantic_index_path=sidecar, **activation_kwargs)
@@ -373,7 +355,7 @@ def test_frozen_rollback_is_non_destructive_when_only_bundle_is_active(tmp_path:
     assert not user_manifest.exists()
 
 
-def test_activation_blocks_semantic_replacement_after_replay(tmp_path: Path, monkeypatch) -> None:
+def test_activation_blocks_semantic_replacement_after_replay(tmp_path: Path, monkeypatch, qdrant_client) -> None:
     import numpy as np
     import runtime.rag_production as production
     import scripts.validate_production_rag as validator
@@ -381,7 +363,7 @@ def test_activation_blocks_semantic_replacement_after_replay(tmp_path: Path, mon
     monkeypatch.setenv("YOLO11_DAMAGE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(validator, "active_rag_status", lambda: {"active": False})
     db = _indexed_database(tmp_path)
-    sidecar = _semantic_sidecar(db, tmp_path / "semantic.npz")
+    sidecar = _semantic_sidecar(db, tmp_path / "semantic.qdrant.json")
     activation_kwargs = _activation_inputs(tmp_path, db, production, validator)
     active_manifest = production.active_rag_manifest_path()
     active_manifest_before = active_manifest.read_bytes() if active_manifest.is_file() else None
@@ -389,11 +371,9 @@ def test_activation_blocks_semantic_replacement_after_replay(tmp_path: Path, mon
 
     def replacing_validate(*args, **kwargs):
         result = original_validate(*args, **kwargs)
-        with np.load(sidecar, allow_pickle=False) as arrays:
-            vectors = np.asarray(arrays["vectors"]) * 2
-            chunk_ids = np.asarray(arrays["chunk_ids"])
-            content_hashes = np.asarray(arrays["content_hashes"])
-        np.savez_compressed(sidecar, vectors=vectors, chunk_ids=chunk_ids, content_hashes=content_hashes)
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+        payload["switched"] = True
+        sidecar.write_text(json.dumps(payload), encoding="utf-8")
         return result
 
     monkeypatch.setattr(validator, "validate", replacing_validate)
@@ -778,30 +758,17 @@ def test_build_activate_requires_gui_scope_inputs(tmp_path: Path) -> None:
         raise AssertionError("--activate without GUI scope validation inputs must fail")
 
 
-def test_semantic_sidecar_validates_npz_shape_and_identity(tmp_path: Path) -> None:
-    import json as json_module
-    import numpy as np
+def test_qdrant_health_validates_vector_identity(tmp_path: Path, qdrant_client) -> None:
+    from qdrant_client import models
+    from knowledge_pipeline.qdrant_store import point_id
     from runtime.rag_production import inspect_v2_database
-
     db = _indexed_database(tmp_path)
-    with sqlite3.connect(db) as connection:
-        rows = connection.execute(
-            "SELECT chunk_id,content_hash FROM pipeline_chunks WHERE retrieval_role='retrieval' AND text_search<>'' ORDER BY document_id,location,chunk_id"
-        ).fetchall()
-    identity = [(str(row[0]), str(row[1])) for row in rows]
-    fingerprint = hashlib.sha256(json_module.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
-    sidecar = tmp_path / "semantic.npz"
-    np.savez_compressed(sidecar, vectors=np.ones((len(identity), 3), dtype=np.float32), chunk_ids=np.asarray([item[0] for item in identity]), content_hashes=np.asarray([item[1] for item in identity]))
-    Path(str(sidecar) + ".manifest.json").write_text(json.dumps({"schema_version": "knowledge-embeddings.v1", "count": len(identity), "dimension": 3, "source_fingerprint": fingerprint}), encoding="utf-8")
-    assert inspect_v2_database(db, semantic_index_path=sidecar, strict=True)["healthy"] is True
-    np.savez_compressed(sidecar, vectors=np.ones((len(identity), 3, 1), dtype=np.float32), chunk_ids=np.asarray([item[0] for item in identity]), content_hashes=np.asarray([item[1] for item in identity]))
-    broken = inspect_v2_database(db, semantic_index_path=sidecar, strict=True)
+    descriptor = _semantic_sidecar(db, tmp_path / "semantic.qdrant.json")
+    assert inspect_v2_database(db, semantic_index_path=descriptor, strict=True)["healthy"] is True
+    qdrant_client.update_vectors("quality-test", [models.PointVectors(id=point_id("doc-quality:child:0"), vector=[1, 0, 0])], wait=True)
+    broken = inspect_v2_database(db, semantic_index_path=descriptor, strict=True)
     assert broken["healthy"] is False
-    assert any(reason in broken["integrity_errors"] for reason in ("semantic_array_shape_invalid", "semantic_index_shape_invalid"))
-    np.savez_compressed(sidecar, vectors=np.ones((len(identity), 3), dtype=np.float32), chunk_ids=np.asarray([item[0] for item in identity], dtype=object), content_hashes=np.asarray([item[1] for item in identity], dtype=object))
-    unsafe = inspect_v2_database(db, semantic_index_path=sidecar, strict=True)
-    assert unsafe["healthy"] is False
-    assert any(reason in unsafe["integrity_errors"] for reason in ("semantic_object_dtype_unsafe", "semantic_index_object_dtype_unsafe"))
+    assert "qdrant_vectors_sha256_mismatch" in broken["integrity_errors"]
 
 
 def test_version_compatibility_accepts_newer_and_rejects_older(tmp_path: Path) -> None:

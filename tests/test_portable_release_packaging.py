@@ -9,11 +9,19 @@ import sys
 import types
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def snapshot_export(monkeypatch):
+    def export(descriptor, output):
+        output.write_bytes(b"fixture-native-qdrant-snapshot")
+        return {"collection_name": "fixture", "sha256": _sha(output)}
+
+    monkeypatch.setattr("knowledge_pipeline.qdrant_backup.export_snapshot", export)
 
 
 def _sha(path: Path) -> str:
@@ -55,18 +63,18 @@ def _portable_fixture(tmp_path: Path) -> dict[str, Path]:
             "INSERT INTO pipeline_chunks VALUES (?,?,?)",
             ("chunk-a", r"C:\private\assets\page.png", json.dumps({"token": ""})),
         )
-    semantic = candidate / "semantic.npz"
-    np.savez_compressed(
-        semantic,
-        vectors=np.ones((1, 2), dtype=np.float32),
-        chunk_ids=np.asarray(["chunk-a"]),
-        content_hashes=np.asarray(["hash-a"]),
-    )
+    semantic = candidate / "semantic.qdrant.json"
     semantic_manifest = Path(str(semantic) + ".manifest.json")
     semantic_manifest.write_text(
         json.dumps(
             {
-                "schema_version": "knowledge-embeddings.v1",
+                "schema_version": "knowledge-qdrant.v1",
+                "backend": "qdrant",
+                "normalized": True,
+                "collection_name": "fixture",
+                "source_fingerprint": "fingerprint",
+                "vectors_sha256": "vector-digest",
+                "status": "ready",
                 "model_name": "fixture/model",
                 "model_path": r"C:\private\huggingface\fixture",
                 "dimension": 2,
@@ -75,6 +83,7 @@ def _portable_fixture(tmp_path: Path) -> dict[str, Path]:
         ),
         encoding="utf-8",
     )
+    semantic.write_bytes(semantic_manifest.read_bytes())
     (candidate / "validation_report.json").write_text(
         json.dumps({"status": "ready", "source_path": r"C:\private\report.json"}), encoding="utf-8"
     )
@@ -89,9 +98,9 @@ def _portable_fixture(tmp_path: Path) -> dict[str, Path]:
                 "manifest_version": 1,
                 "database_path": "production-rag-fixture/knowledge_base_v2.sqlite3",
                 "database_sha256": _sha(database),
-                "semantic_index_path": "production-rag-fixture/semantic.npz",
+                "semantic_index_path": "production-rag-fixture/semantic.qdrant.json",
                 "semantic_index_sha256": _sha(semantic),
-                "semantic_manifest_path": "production-rag-fixture/semantic.npz.manifest.json",
+                "semantic_manifest_path": "production-rag-fixture/semantic.qdrant.json.manifest.json",
                 "semantic_manifest_sha256": _sha(semantic_manifest),
                 "source_documents": [
                     {
@@ -158,6 +167,10 @@ def test_portable_staging_sanitizes_and_binds_active_rag(tmp_path: Path) -> None
     assert staged_active["source_documents"][0]["source_path"] == "source_files/source.pdf"
     assert staged_active["source_documents"][0]["source_bundled"] is True
     assert json.loads(staged_semantic_manifest.read_text(encoding="utf-8"))["model_path"] == ""
+    staged_semantic = stage / "knowledge_base" / staged_active["semantic_index_path"]
+    assert staged_semantic.read_bytes() == staged_semantic_manifest.read_bytes()
+    snapshot = staged_active["qdrant_snapshot"]
+    assert _sha(stage / "knowledge_base" / snapshot["path"]) == snapshot["sha256"]
     with sqlite3.connect(staged_db) as connection:
         assert connection.execute("SELECT source_path FROM pipeline_documents").fetchone()[0] == "source_files/source.pdf"
         metadata = json.loads(connection.execute("SELECT metadata_json FROM pipeline_documents").fetchone()[0])
@@ -399,6 +412,9 @@ def test_source_release_uses_portable_stage_and_excludes_user_state(tmp_path: Pa
     (project / "requirements-lock.txt").write_text("torch==fixture\n", encoding="utf-8")
     (project / "start_yolo11s_seg_gui.bat").write_text("python scripts\\launch.py", encoding="utf-8")
     (project / "gui_api_config.json").write_text('{"api_key":"secret-value"}', encoding="utf-8")
+    private_storage = project / "deployment" / "qdrant" / "storage"
+    private_storage.mkdir(parents=True)
+    (private_storage / "private-vectors.bin").write_bytes(b"private")
     stage = tmp_path / "stage"
     prepare_portable_resources(
         project_root=project,
@@ -424,4 +440,5 @@ def test_source_release_uses_portable_stage_and_excludes_user_state(tmp_path: Pa
     assert (candidate / "portable_stage_manifest.json").is_file()
     assert "prefix:" not in (candidate / "environment.yml").read_text(encoding="utf-8")
     assert not (candidate / "gui_api_config.json").exists()
+    assert not (candidate / "deployment" / "qdrant" / "storage").exists()
     assert verified["knowledge_base"]["source_documents_bundled"] == 1

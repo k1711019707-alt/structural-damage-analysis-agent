@@ -329,7 +329,7 @@ def _build_locked(
         write_json(str(chunks_dir / f"{digest[:20]}.chunks.json"), chunks)
         result = build_index(chunks, db_path)
         documents.append(_document_manifest(source, digest, group["aliases"], converted, result))
-    semantic_path = output_dir / "semantic.npz"
+    semantic_path = output_dir / "semantic.qdrant.json"
     semantic_error = ""
     try:
         semantic_manifest = build_embedding_index(

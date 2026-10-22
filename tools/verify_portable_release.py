@@ -114,6 +114,10 @@ def _verify_rag(bundle: Path, release: dict[str, Any]) -> dict[str, Any]:
     active = json.loads(active_path.read_text(encoding="utf-8"))
     database = _inside(active_path.parent, str(active.get("database_path") or ""), label="RAG database")
     semantic = _inside(active_path.parent, str(active.get("semantic_index_path") or ""), label="semantic index")
+    backup = active.get("qdrant_snapshot") or {}
+    snapshot = _inside(active_path.parent, str(backup.get("path") or ""), label="Qdrant snapshot")
+    if not snapshot.is_file() or sha256_file(snapshot) != backup.get("sha256"):
+        raise PortableVerificationError("bundled Qdrant snapshot is missing or has a different SHA-256")
     from runtime.rag_production import inspect_v2_database
 
     health = inspect_v2_database(

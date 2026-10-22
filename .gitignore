@@ -30,6 +30,11 @@ dist/
 runs/
 artifacts/
 knowledge_base/
+deployment/qdrant/storage/
+deployment/qdrant/snapshots/
+deployment/qdrant/.qdrant-initialized
+*.snapshot
+qdrant_storage/
 dataset/
 YOLO11-seg/
 *.sqlite3

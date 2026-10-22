@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 import shutil
 import sqlite3
@@ -172,7 +173,7 @@ def _readonly_sqlite(path: str | Path) -> sqlite3.Connection:
 
 
 def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict[str, Any], Any | None, tuple[str, ...]]:
-    """Revalidate live activation bytes and cache only digest-bound semantic arrays."""
+    """Revalidate activation and cache the digest-bound Qdrant retriever."""
     from runtime import rag_production
     from runtime.app_paths import active_rag_manifest_path
 
@@ -198,6 +199,10 @@ def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict
     semantic_path: Path | None = None
     semantic_manifest_path: Path | None = None
     semantic = None
+    endpoint_key = (
+        os.environ.get("YOLO11_QDRANT_URL", ""),
+        hashlib.sha256(os.environ.get("YOLO11_QDRANT_API_KEY", "").encode()).hexdigest(),
+    )
     semantic_health = status.get("semantic")
     if not isinstance(semantic_health, dict):
         semantic_health = (
@@ -211,6 +216,9 @@ def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict
         try:
             from knowledge_pipeline.semantic_retrieve import SemanticRetriever
 
+            if semantic_health.get("configured") and not semantic_health.get("healthy"):
+                raise RuntimeError(str(semantic_health.get("reason") or "qdrant_unhealthy"))
+
             semantic_path_value = semantic_health.get("path")
             if semantic_path_value:
                 semantic_path = Path(str(semantic_path_value)).resolve()
@@ -219,7 +227,7 @@ def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict
                     active_manifest.get("semantic_index_path"), manifest_path=selected_manifest_path
                 )
             if semantic_path is None:
-                raise FileNotFoundError("configured semantic sidecar path could not be resolved")
+                raise FileNotFoundError("configured Qdrant descriptor path could not be resolved")
             semantic_manifest_path = (
                 Path(str(semantic_health["manifest_path"])).resolve()
                 if semantic_health.get("manifest_path")
@@ -237,6 +245,7 @@ def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict
                 or ""
             )
             semantic_key = (
+                endpoint_key,
                 str(semantic_path),
                 semantic_index_sha256,
                 str(semantic_manifest_path),
@@ -265,6 +274,7 @@ def _active_runtime_state(manifest_path: str | Path | None = None) -> tuple[dict
             warnings.append(f"semantic_unavailable:{type(exc).__name__}")
 
     semantic_key = (
+        endpoint_key,
         str(semantic_path or ""),
         str(
             active_manifest.get("semantic_index_sha256")

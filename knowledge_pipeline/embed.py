@@ -1,4 +1,4 @@
-"""Build a local embedding sidecar for v2 retrieval children.
+"""Build a local Qdrant collection for v2 retrieval children.
 
 The model dependency is intentionally optional.  ``sentence-transformers`` is
 loaded only when the CLI/API is used without an injected ``embedder``; tests
@@ -9,15 +9,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sqlite3
+import uuid
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Iterable
 
 import numpy as np
 
-from .contracts import StageStatus, read_json, write_json
+from .contracts import write_json
 
 
 def _fingerprint(rows: Iterable[sqlite3.Row]) -> str:
@@ -53,8 +53,13 @@ def build_embedding_index(
     batch_size: int = 32,
     device: str | None = None,
     embedder: Any | None = None,
+    client: Any | None = None,
 ) -> dict[str, Any]:
+    from .qdrant_store import sync_vectors
+
     target = Path(output_path); target.parent.mkdir(parents=True, exist_ok=True)
+    if target.suffix.lower() != ".json":
+        raise ValueError("Qdrant 索引输出必须为 .json 描述文件，不再生成 NPZ")
     with closing(sqlite3.connect(db_path)) as db:
         db.row_factory = sqlite3.Row
         rows = db.execute("SELECT * FROM pipeline_chunks WHERE retrieval_role='retrieval' AND text_search<>'' ORDER BY document_id, location, chunk_id").fetchall()
@@ -66,28 +71,16 @@ def build_embedding_index(
         matrix = _encode(encoder, texts, max(1, int(batch_size)))
         chunk_ids = np.asarray([str(row["chunk_id"]) for row in rows], dtype=np.str_)
         content_hashes = np.asarray([str(row["content_hash"] or "") for row in rows], dtype=np.str_)
-    manifest = {
-        "schema_version": "knowledge-embeddings.v1",
-        "model_name": model_name,
-        "model_path": str(model_path or ""),
-        "device": str(device or "auto"),
-        "dimension": int(matrix.shape[1]),
-        "normalized": True,
-        "count": int(matrix.shape[0]),
-        "db_path": str(Path(db_path).resolve()),
-        "source_fingerprint": fingerprints,
-        "status": "ready",
-    }
-    tmp = target.with_suffix(target.suffix + ".tmp")
-    np.savez_compressed(tmp, vectors=matrix, chunk_ids=chunk_ids, content_hashes=content_hashes)
-    generated = Path(str(tmp) + ".npz") if not tmp.exists() and Path(str(tmp) + ".npz").exists() else tmp
-    os.replace(generated, target)
-    write_json(str(Path(str(target) + ".manifest.json")), manifest)
-    return manifest
+    return sync_vectors(
+        matrix, chunk_ids.tolist(), content_hashes.tolist(),
+        document_ids=[str(row["document_id"]) for row in rows],
+        collection_name=f"knowledge_{uuid.uuid4().hex}", model_name=model_name,
+        model_path=model_path, source_fingerprint_value=fingerprints, descriptor_path=target, client=client,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build local semantic embedding sidecar for v2 SQLite")
+    parser = argparse.ArgumentParser(description="Build local Qdrant vectors and a JSON descriptor for v2 SQLite")
     parser.add_argument("db", type=Path); parser.add_argument("output", type=Path)
     parser.add_argument("--model", default="BAAI/bge-small-zh-v1.5"); parser.add_argument("--model-path")
     parser.add_argument("--batch-size", type=int, default=32); parser.add_argument("--device"); parser.add_argument("--manifest", type=Path)

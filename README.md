@@ -44,7 +44,7 @@ flowchart TD
 | --- | --- | --- |
 | 损伤识别 | P2-YOLO11s-seg、Ultralytics、PyTorch | 图像实例分割；正式权重为 `models/best.pt` |
 | 文本嵌入 | `BAAI/bge-small-zh-v1.5`、sentence-transformers | 本地工程资料与查询向量编码 |
-| 检索存储 | SQLite FTS5、NumPy `.npz` | 词法召回、向量余弦相似度与加权 RRF 融合 |
+| 检索存储 | SQLite FTS5、Qdrant | SQLite 保存文本与词法索引；Qdrant 保存全部向量，使用余弦相似度与加权 RRF 融合 |
 | 文档解析 | Docling、PyMuPDF、RapidOCR、Camelot、pdfplumber | PDF 版面、文字、OCR 与表格处理 |
 | 报告与方案 | 兼容 OpenAI Responses API 的模型服务、Pydantic | 多模态分析与结构化输出校验 |
 | 桌面界面 | PySide6 | 检测工作台、设置、知识库与审核对话框 |
@@ -102,8 +102,11 @@ python -m pip install -r requirements-lock.txt
 在仓库根目录、已激活环境中执行：
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File deployment/qdrant/start_qdrant.ps1
 python scripts/launch_yolo11s_seg_gui.py
 ```
+
+Windows 启动脚本安装并校验官方 Qdrant 1.19.2，后台运行，仅监听本机 `127.0.0.1:6333`。数据持久化到 `deployment/qdrant/storage/`。也可使用 Docker Compose；启动、迁移与备份见 [Qdrant 部署说明](deployment/qdrant/README.md)。
 
 也可运行 `start_yolo11s_seg_gui.bat`。脚本优先使用项目内 `YOLO11s\Scripts\python.exe`，不存在时使用当前 PATH 中的 Python。
 
@@ -125,12 +128,14 @@ python scripts/launch_yolo11s_seg_gui.py
 python -m knowledge_pipeline.pdf_convert input.pdf work/converted.json
 python -m knowledge_pipeline.chunk work/converted.json work/chunks.json
 python -m knowledge_pipeline.index work/chunks.json work/knowledge.sqlite3 --manifest work/index_manifest.json
-python -m knowledge_pipeline.embed work/knowledge.sqlite3 work/semantic.npz --model BAAI/bge-small-zh-v1.5
-python -m knowledge_pipeline.retrieve "混凝土结构裂缝如何修复" work/knowledge.sqlite3 work/retrieval.json --semantic-index work/semantic.npz
+python -m knowledge_pipeline.embed work/knowledge.sqlite3 work/semantic.qdrant.json --model BAAI/bge-small-zh-v1.5
+python -m knowledge_pipeline.retrieve "混凝土结构裂缝如何修复" work/knowledge.sqlite3 work/retrieval.json --semantic-index work/semantic.qdrant.json
 python -m knowledge_pipeline.rerank work/retrieval.json work/reranked.json
 ```
 
-嵌入索引只编码用于召回的 child 切片，parent 作为上下文扩展。语义索引包含 chunk ID、内容哈希与语料指纹，查询时检查它与 SQLite 语料是否一致。独立检索在语义通道不可用时保留词法召回并报告告警；GUI 生产同步和活动版本切换还受质量与完整性门禁约束。
+嵌入只编码用于召回的 child 切片，parent 作为上下文扩展。向量直接批量写入 Qdrant，按文档范围过滤后执行 top-k；JSON 描述文件及伴随清单只保存 collection、模型、维度、数量与完整性摘要，不保存向量。项目不再生成或读取 NumPy sidecar 进行检索。Qdrant 不可用时保留 SQLite 词法召回并报告告警；GUI 生产同步和活动版本切换仍要求通过 Qdrant 完整性门禁。
+
+历史活动库可运行 `python scripts/sync_qdrant.py` 一次性导入旧 NPZ，无需重新嵌入。迁移脚本是唯一保留的 NPZ 读取入口；校验成功才切换活动版本。运行数据、快照、模型缓存与服务二进制均不提交 GitHub。
 
 离线编码可向 `knowledge_pipeline.embed` 传入 `--model-path`。生产库构建、验证、激活与回滚详见 [生产 RAG 操作说明](knowledge_pipeline/PRODUCTION_RAG_RUNBOOK.md)。普通示例索引不会自动成为 GUI 的生产活动版本。
 

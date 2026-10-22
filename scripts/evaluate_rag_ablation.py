@@ -29,7 +29,7 @@ from knowledge_pipeline.external_fallback import route_external_answer
 
 DEFAULT_GOLD = PROJECT_ROOT / "benchmarks" / "rag" / "formal_v1" / "gold_v1" / "gold.jsonl"
 DEFAULT_DB = PROJECT_ROOT / "knowledge_pipeline" / "test" / "results" / "index" / "pipeline.sqlite3"
-DEFAULT_SEMANTIC = PROJECT_ROOT / "knowledge_pipeline" / "test" / "results" / "embed" / "semantic.npz"
+DEFAULT_SEMANTIC = PROJECT_ROOT / "knowledge_pipeline" / "test" / "results" / "embed" / "semantic.qdrant.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "benchmarks" / "rag" / "formal_v1" / "evaluation_v1"
 DEFAULT_OUTPUT_V2 = PROJECT_ROOT / "benchmarks" / "rag" / "formal_v1" / "evaluation_v2"
 KS = (1, 3, 5, 10, 30)
@@ -362,7 +362,7 @@ def evaluate(
         "semantic_path": str(semantic_path.resolve()), "semantic_sha256": sha256(semantic_path),
         "semantic_manifest_sha256": sha256(Path(str(semantic_path) + ".manifest.json")),
         "semantic_model": semantic.manifest.get("model_name", "BAAI/bge-small-zh-v1.5"),
-        "semantic_dimension": semantic.vectors.shape[1], "semantic_count": semantic.vectors.shape[0],
+        "semantic_dimension": semantic.manifest["dimension"], "semantic_count": semantic.manifest["count"],
         "semantic_initialization_ms": semantic_init_ms,
         "configs": list(configs), "ks": list(KS), "candidate_pool": CANDIDATE_POOL,
         "python": sys.version, "platform": platform.platform(),

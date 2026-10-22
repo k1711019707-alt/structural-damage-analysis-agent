@@ -19,6 +19,6 @@ test_pdf_convert.py
 → test_generate.py
 ```
 
-也可以直接启动 `test_rag_pipeline.py` 一次性验证上述链路。`test_embed.py` 需要本地 `sentence-transformers` 和模型权重；成功后才能运行 `test_semantic_retrieve.py`。这两个脚本缺少依赖或 sidecar 时会明确返回失败，不会伪造语义检索成功。
+也可以直接启动 `test_rag_pipeline.py` 一次性验证上述链路。`test_embed.py` 需要运行中的 Qdrant、本地 `sentence-transformers` 和模型权重；成功后才能运行 `test_semantic_retrieve.py`。缺少服务、依赖或描述文件时会明确返回失败，不会伪造语义检索成功。
 
 PDF 脚本使用当前 v3 解析入口并传入 `--offline-docling`，因此不会因测试启动而主动下载 Docling 模型；视觉 Responses API 只有显式传入模块的 `--vision` 参数才会启用，本测试脚本默认不发起远程请求。
